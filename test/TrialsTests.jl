@@ -2,7 +2,6 @@ module TrialsTests
 
 using BenchmarkTools
 using Test
-using Statistics
 
 #########
 # Trial #
@@ -135,15 +134,45 @@ tj_r_2 = judge(tr; time_tolerance = 2.0, memory_tolerance = 2.0)
 @test isinvariant(tj_ab_2)
 @test isinvariant(tj_r_2)
 
+@test !(isinvariant(time, tj_ab))
+@test !(isinvariant(time, tj_r))
+@test isinvariant(time, tj_ab_2)
+@test isinvariant(time, tj_r_2)
+
+@test !(isinvariant(memory, tj_ab))
+@test !(isinvariant(memory, tj_r))
+@test isinvariant(memory, tj_ab_2)
+@test isinvariant(memory, tj_r_2)
+
 @test isregression(tj_ab)
 @test isregression(tj_r)
 @test !(isregression(tj_ab_2))
 @test !(isregression(tj_r_2))
 
+@test !(isregression(time, tj_ab))
+@test !(isregression(time, tj_r))
+@test !(isregression(time, tj_ab_2))
+@test !(isregression(time, tj_r_2))
+
+@test isregression(memory, tj_ab)
+@test isregression(memory, tj_r)
+@test !(isregression(memory, tj_ab_2))
+@test !(isregression(memory, tj_r_2))
+
 @test isimprovement(tj_ab)
 @test isimprovement(tj_r)
 @test !(isimprovement(tj_ab_2))
 @test !(isimprovement(tj_r_2))
+
+@test isimprovement(time, tj_ab)
+@test isimprovement(time, tj_r)
+@test !(isimprovement(time, tj_ab_2))
+@test !(isimprovement(time, tj_r_2))
+
+@test !(isimprovement(memory, tj_ab))
+@test !(isimprovement(memory, tj_r))
+@test !(isimprovement(memory, tj_ab_2))
+@test !(isimprovement(memory, tj_r_2))
 
 ###################
 # pretty printing #
@@ -168,5 +197,26 @@ tj_r_2 = judge(tr; time_tolerance = 2.0, memory_tolerance = 2.0)
 @test BenchmarkTools.prettymemory(1048576) == "1.00 MiB"
 @test BenchmarkTools.prettymemory(1073741823) == "1024.00 MiB"
 @test BenchmarkTools.prettymemory(1073741824) == "1.00 GiB"
+
+@test sprint(show, "text/plain", ta) == sprint(show, ta; context=:compact => false) == """
+BenchmarkTools.TrialEstimate: 
+  time:             0.490 ns
+  gctime:           0.000 ns (0.00%)
+  memory:           2 bytes
+  allocs:           1"""
+
+@test sprint(show, ta) == "TrialEstimate(0.490 ns)"
+@test sprint(
+    show, ta;
+    context = IOContext(
+        devnull, :compact => true, :typeinfo => BenchmarkTools.TrialEstimate)
+) == "0.490 ns"
+
+@test sprint(show, [ta, tb]) == "BenchmarkTools.TrialEstimate[0.490 ns, 1.000 ns]"
+
+@test sprint(show, "text/plain", [ta, tb]) == """
+2-element Array{BenchmarkTools.TrialEstimate,1}:
+ 0.490 ns
+ 1.000 ns"""
 
 end # module

@@ -221,9 +221,25 @@ function judge(ratio::Real, tolerance::Float64)
     end
 end
 
-isimprovement(t::TrialJudgement) = time(t) == :improvement || memory(t) == :improvement
-isregression(t::TrialJudgement) = time(t) == :regression || memory(t) == :regression
-isinvariant(t::TrialJudgement) = time(t) == :invariant && memory(t) == :invariant
+isimprovement(f, t::TrialJudgement) = f(t) == :improvement
+isimprovement(t::TrialJudgement) = isimprovement(time, t) || isimprovement(memory, t)
+
+isregression(f, t::TrialJudgement) = f(t) == :regression
+isregression(t::TrialJudgement) = isregression(time, t) || isregression(memory, t)
+
+isinvariant(f, t::TrialJudgement) = f(t) == :invariant
+isinvariant(t::TrialJudgement) = isinvariant(time, t) && isinvariant(memory, t)
+
+const colormap = (
+    regression = :red,
+    improvement = :green,
+    invariant = :normal,
+)
+
+printtimejudge(io, t::TrialJudgement) =
+    printstyled(io, time(t); color=colormap[time(t)])
+printmemoryjudge(io, t::TrialJudgement) =
+    printstyled(io, memory(t); color=colormap[memory(t)])
 
 ###################
 # Pretty Printing #
@@ -262,10 +278,38 @@ function prettymemory(b)
     return string(@sprintf("%.2f", value), " ", units)
 end
 
-Base.show(io::IO, t::Trial) = print(io, "Trial(", prettytime(time(t)), ")")
-Base.show(io::IO, t::TrialEstimate) = print(io, "TrialEstimate(", prettytime(time(t)), ")")
-Base.show(io::IO, t::TrialRatio) = print(io, "TrialRatio(", prettypercent(time(t)), ")")
-Base.show(io::IO, t::TrialJudgement) = print(io, "TrialJudgement(", prettydiff(time(ratio(t))), " => ", time(t), ")")
+function withtypename(f, io, t)
+    needtype = get(io, :typeinfo, Nothing) !== typeof(t)
+    if needtype
+        print(io, nameof(typeof(t)), '(')
+    end
+    f()
+    if needtype
+        print(io, ')')
+    end
+end
+
+_summary(io, t, args...) = withtypename(() -> print(io, args...), io, t)
+
+Base.summary(io::IO, t::Trial) = _summary(io, t, prettytime(time(t)))
+Base.summary(io::IO, t::TrialEstimate) = _summary(io, t, prettytime(time(t)))
+Base.summary(io::IO, t::TrialRatio) = _summary(io, t, prettypercent(time(t)))
+Base.summary(io::IO, t::TrialJudgement) = withtypename(io, t) do
+    print(io, prettydiff(time(ratio(t))), " => ")
+    printtimejudge(io, t)
+end
+
+_show(io, t) =
+    if get(io, :compact, true)
+        summary(io, t)
+    else
+        show(io, MIME"text/plain"(), t)
+    end
+
+Base.show(io::IO, t::Trial) = _show(io, t)
+Base.show(io::IO, t::TrialEstimate) = _show(io, t)
+Base.show(io::IO, t::TrialRatio) = _show(io, t)
+Base.show(io::IO, t::TrialJudgement) = _show(io, t)
 
 function Base.show(io::IO, ::MIME"text/plain", t::Trial)
     if length(t) > 0
@@ -288,36 +332,44 @@ function Base.show(io::IO, ::MIME"text/plain", t::Trial)
         meanstr = "N/A"
     end
     println(io, "BenchmarkTools.Trial: ")
-    println(io, "  memory estimate:  ", memorystr)
-    println(io, "  allocs estimate:  ", allocsstr)
-    println(io, "  --------------")
-    println(io, "  minimum time:     ", minstr)
-    println(io, "  median time:      ", medstr)
-    println(io, "  mean time:        ", meanstr)
-    println(io, "  maximum time:     ", maxstr)
-    println(io, "  --------------")
-    println(io, "  samples:          ", length(t))
-    print(io,   "  evals/sample:     ", t.params.evals)
+    pad = get(io, :pad, "")
+    println(io, pad, "  memory estimate:  ", memorystr)
+    println(io, pad, "  allocs estimate:  ", allocsstr)
+    println(io, pad, "  --------------")
+    println(io, pad, "  minimum time:     ", minstr)
+    println(io, pad, "  median time:      ", medstr)
+    println(io, pad, "  mean time:        ", meanstr)
+    println(io, pad, "  maximum time:     ", maxstr)
+    println(io, pad, "  --------------")
+    println(io, pad, "  samples:          ", length(t))
+    print(io,   pad, "  evals/sample:     ", t.params.evals)
 end
 
 function Base.show(io::IO, ::MIME"text/plain", t::TrialEstimate)
     println(io, "BenchmarkTools.TrialEstimate: ")
-    println(io, "  time:             ", prettytime(time(t)))
-    println(io, "  gctime:           ", prettytime(gctime(t)), " (", prettypercent(gctime(t) / time(t)),")")
-    println(io, "  memory:           ", prettymemory(memory(t)))
-    print(io,   "  allocs:           ", allocs(t))
+    pad = get(io, :pad, "")
+    println(io, pad, "  time:             ", prettytime(time(t)))
+    println(io, pad, "  gctime:           ", prettytime(gctime(t)), " (", prettypercent(gctime(t) / time(t)),")")
+    println(io, pad, "  memory:           ", prettymemory(memory(t)))
+    print(io,   pad, "  allocs:           ", allocs(t))
 end
 
 function Base.show(io::IO, ::MIME"text/plain", t::TrialRatio)
     println(io, "BenchmarkTools.TrialRatio: ")
-    println(io, "  time:             ", time(t))
-    println(io, "  gctime:           ", gctime(t))
-    println(io, "  memory:           ", memory(t))
-    print(io,   "  allocs:           ", allocs(t))
+    pad = get(io, :pad, "")
+    println(io, pad, "  time:             ", time(t))
+    println(io, pad, "  gctime:           ", gctime(t))
+    println(io, pad, "  memory:           ", memory(t))
+    print(io,   pad, "  allocs:           ", allocs(t))
 end
 
 function Base.show(io::IO, ::MIME"text/plain", t::TrialJudgement)
     println(io, "BenchmarkTools.TrialJudgement: ")
-    println(io, "  time:   ", prettydiff(time(ratio(t))), " => ", time(t), " (", prettypercent(params(t).time_tolerance), " tolerance)")
-    print(io,   "  memory: ", prettydiff(memory(ratio(t))), " => ", memory(t), " (", prettypercent(params(t).memory_tolerance), " tolerance)")
+    pad = get(io, :pad, "")
+    print(io, pad, "  time:   ", prettydiff(time(ratio(t))), " => ")
+    printtimejudge(io, t)
+    println(io, " (", prettypercent(params(t).time_tolerance), " tolerance)")
+    print(io,   pad, "  memory: ", prettydiff(memory(ratio(t))), " => ")
+    printmemoryjudge(io, t)
+    println(io, " (", prettypercent(params(t).memory_tolerance), " tolerance)")
 end

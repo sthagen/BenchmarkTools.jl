@@ -91,7 +91,7 @@ Alternatively, you can use the `@btime` or `@belapsed` macros.
 These take exactly the same arguments as `@benchmark`, but
 behave like the `@time` or `@elapsed` macros included with
 Julia: `@btime` prints the minimum time and memory allocation
-before returning the value of the expression, while `@elapsed`
+before returning the value of the expression, while `@belapsed`
 returns the minimum time in seconds.
 
 ```julia
@@ -511,7 +511,7 @@ suite["utf8"] = BenchmarkGroup(["string", "unicode"])
 suite["trig"] = BenchmarkGroup(["math", "triangles"])
 
 # Add some benchmarks to the "utf8" group
-teststr = join(rand(MersenneTwister(1), 'a':'d', 10^4));
+teststr = join(rand('a':'d', 10^4));
 suite["utf8"]["replace"] = @benchmarkable replace($teststr, "a" => "b")
 suite["utf8"]["join"] = @benchmarkable join($teststr, $teststr)
 
@@ -591,7 +591,7 @@ Following from the previous section, we see that running our benchmark suite ret
 julia> results["utf8"]
 BenchmarkTools.BenchmarkGroup:
   tags: ["string", "unicode"]
-  "join" => Trial(133.84 ms) # showcompact for Trial displays the minimum time estimate
+  "join" => Trial(133.84 ms) # summary(::Trial) displays the minimum time estimate
   "replace" => Trial(202.3 μs)
 
 julia> results["trig"]

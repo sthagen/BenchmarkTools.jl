@@ -82,15 +82,31 @@ judge(groups::BenchmarkGroup...; kwargs...) = mapvals((x...) -> judge(x...; kwar
 rmskew!(group::BenchmarkGroup) = mapvals!(rmskew!, group)
 rmskew(group::BenchmarkGroup) = mapvals(rmskew, group)
 
+isregression(f, group::BenchmarkGroup) = any((x) -> isregression(f, x), values(group))
 isregression(group::BenchmarkGroup) = any(isregression, values(group))
+
+isimprovement(f, group::BenchmarkGroup) = any((x) -> isimprovement(f, x), values(group))
 isimprovement(group::BenchmarkGroup) = any(isimprovement, values(group))
+
+isinvariant(f, group::BenchmarkGroup) = all((x) -> isinvariant(f, x), values(group))
 isinvariant(group::BenchmarkGroup) = all(isinvariant, values(group))
 
+invariants(f, x) = x
 invariants(x) = x
+
+regressions(f, x) = x
 regressions(x) = x
+
+improvements(f, x) = x
 improvements(x) = x
+
+invariants(f, group::BenchmarkGroup) = mapvals!((x) -> invariants(f, x), filtervals((x) -> isinvariant(f, x), group))
 invariants(group::BenchmarkGroup) = mapvals!(invariants, filtervals(isinvariant, group))
+
+regressions(f, group::BenchmarkGroup) = mapvals!((x) -> regressions(f, x), filtervals((x) -> isregression(f, x), group))
 regressions(group::BenchmarkGroup) = mapvals!(regressions, filtervals(isregression, group))
+
+improvements(f, group::BenchmarkGroup) = mapvals!((x) -> improvements(f, x), filtervals((x) -> isimprovement(f, x), group))
 improvements(group::BenchmarkGroup) = mapvals!(improvements, filtervals(isimprovement, group))
 
 function loadparams!(group::BenchmarkGroup, paramsgroup::BenchmarkGroup, fields...)
@@ -248,21 +264,33 @@ Base.setindex!(group::BenchmarkGroup, v, k::BenchmarkGroup) = error("A Benchmark
 
 tagrepr(tags) = string("[", join(map(repr, tags), ", "), "]")
 
-Base.show(io::IO, group::BenchmarkGroup) = print(io, "$(length(group))-element BenchmarkGroup($(tagrepr(group.tags)))")
+Base.summary(io::IO, group::BenchmarkGroup) = print(io, "$(length(group))-element BenchmarkGroup($(tagrepr(group.tags)))")
 
-function Base.show(io::IO, mime::MIME"text/plain", group::BenchmarkGroup, pad = ""; verbose = false, limit = 10)
+function Base.show(io::IO, group::BenchmarkGroup)
+    limit = get(io, :limit, true)
+    if !(limit isa Bool)
+        msg = (
+            "`show(IOContext(io, :limit => number), group::BenchmarkGroup)` is" *
+            " deprecated. Please use `IOContext(io, :boundto => number)` to" *
+            " bound the number of elements to be shown."
+        )
+        Base.depwarn(msg, :show)
+        nbound = get(io, :boundto, limit)
+    elseif limit === false
+        nbound = Inf
+    else
+        nbound = get(io, :boundto, 10)
+    end
+
     println(io, "$(length(group))-element BenchmarkTools.BenchmarkGroup:")
+    pad = get(io, :pad, "")
     print(io, pad, "  tags: ", tagrepr(group.tags))
     count = 1
     for (k, v) in group
         println(io)
         print(io, pad, "  ", repr(k), " => ")
-        if verbose && isa(v, BenchmarkGroup)
-            show(io, mime, v, "\t"*pad; verbose = verbose, limit = limit)
-        else
-            show(io, v)
-        end
-        count > limit && (println(io); print(io, pad, "  ⋮"); break)
+        show(IOContext(io, :pad => "\t"*pad), v)
+        count > nbound && (println(io); print(io, pad, "  ⋮"); break)
         count += 1
     end
 end

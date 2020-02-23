@@ -3,7 +3,6 @@
 using BenchmarkTools
 using BenchmarkTools: TrialEstimate, Parameters
 using Test
-using Statistics
 
 seteq(a, b) = length(a) == length(b) == length(intersect(a, b))
 
@@ -80,6 +79,26 @@ gtrial = BenchmarkGroup([], Dict("t" => trial))
 @test ratio(g1, g2) == ratio(judge(g1, g2))
 
 @test isinvariant(judge(g1, g1))
+@test isinvariant(time, judge(g1, g1))
+@test isinvariant(memory, judge(g1, g1))
+@test !(isregression(judge(g1, g1)))
+@test !(isregression(time, judge(g1, g1)))
+@test !(isregression(memory, judge(g1, g1)))
+@test !(isimprovement(judge(g1, g1)))
+@test !(isimprovement(time, judge(g1, g1)))
+@test !(isimprovement(memory, judge(g1, g1)))
+
+@test BenchmarkTools.invariants(judge(g1, g2)).data == Dict("c" => judge(tc, tc))
+@test BenchmarkTools.invariants(time, (judge(g1, g2))).data == Dict("c" => judge(tc, tc))
+@test BenchmarkTools.invariants(memory, (judge(g1, g2))).data == Dict("a" => judge(t1a, t2a), "b" => judge(t1b, t2b), "c" => judge(tc, tc))
+@test BenchmarkTools.regressions(judge(g1, g2)).data == Dict("b" => judge(t1b, t2b))
+@test BenchmarkTools.regressions(time, (judge(g1, g2))).data == Dict("b" => judge(t1b, t2b))
+@test BenchmarkTools.regressions(memory, (judge(g1, g2))).data == Dict()
+@test BenchmarkTools.improvements(judge(g1, g2)).data == Dict("a" => judge(t1a, t2a))
+@test BenchmarkTools.improvements(time, (judge(g1, g2))).data == Dict("a" => judge(t1a, t2a))
+@test BenchmarkTools.improvements(memory, (judge(g1, g2))).data == Dict()
+
+@test isinvariant(judge(g1, g1))
 @test !(isinvariant(judge(g1, g2)))
 @test isregression(judge(g1, g2))
 @test !(isregression(judge(g1, g1)))
@@ -88,6 +107,17 @@ gtrial = BenchmarkGroup([], Dict("t" => trial))
 @test invariants(judge(g1, g2)).data == Dict("c" => judge(tc, tc))
 @test regressions(judge(g1, g2)).data == Dict("b" => judge(t1b, t2b))
 @test improvements(judge(g1, g2)).data == Dict("a" => judge(t1a, t2a))
+
+struct Bar end
+@test BenchmarkTools.invariants(Bar()) == Bar()
+@test BenchmarkTools.invariants(time, (Bar())) == Bar()
+@test BenchmarkTools.invariants(memory, (Bar())) == Bar()
+@test BenchmarkTools.regressions(Bar()) == Bar()
+@test BenchmarkTools.regressions(time, (Bar())) == Bar()
+@test BenchmarkTools.regressions(memory, (Bar())) == Bar()
+@test BenchmarkTools.improvements(Bar()) == Bar()
+@test BenchmarkTools.improvements(time, (Bar())) == Bar()
+@test BenchmarkTools.improvements(memory, (Bar())) == Bar()
 
 @test minimum(gtrial)["t"] == minimum(gtrial["t"])
 @test median(gtrial)["t"] == median(gtrial["t"])
@@ -247,5 +277,37 @@ g2[[1, "a", :b]] = "hello"  # should create higher levels on the fly
 
 @test g1 == g2
 
+# pretty printing #
+#-----------------#
+
+g1 = BenchmarkGroup(["1", "2"])
+g1["a"] = t1a
+g1["b"] = t1b
+g1["c"] = tc
+
+@test sprint(show, g1) == """
+3-element BenchmarkTools.BenchmarkGroup:
+  tags: ["1", "2"]
+  "c" => TrialEstimate(1.000 ns)
+  "b" => TrialEstimate(4.123 μs)
+  "a" => TrialEstimate(32.000 ns)"""
+@test sprint(show, g1; context = :boundto => 1) == """
+3-element BenchmarkTools.BenchmarkGroup:
+  tags: ["1", "2"]
+  "c" => TrialEstimate(1.000 ns)
+  "b" => TrialEstimate(4.123 μs)
+  ⋮"""
+@test sprint(show, g1; context = :limit => false) == """
+3-element BenchmarkTools.BenchmarkGroup:
+  tags: ["1", "2"]
+  "c" => TrialEstimate(1.000 ns)
+  "b" => TrialEstimate(4.123 μs)
+  "a" => TrialEstimate(32.000 ns)"""
+@test @test_deprecated(sprint(show, g1; context = :limit => 1)) == """
+3-element BenchmarkTools.BenchmarkGroup:
+  tags: ["1", "2"]
+  "c" => TrialEstimate(1.000 ns)
+  "b" => TrialEstimate(4.123 μs)
+  ⋮"""
 
 # end # module
