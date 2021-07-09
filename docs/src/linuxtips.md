@@ -1,17 +1,6 @@
 # Reproducible benchmarking in Linux-based environments
 
-- [Introduction](#introduction)
-- [Processor shielding and process affinity](#processor-shielding-and-process-affinity)
-- [Virtual memory settings](#virtual-memory-settings)
-    - [Swappiness](#swappiness)
-    - [Address space layout randomization (ASLR)](#address-space-layout-randomization-aslr)
-- [CPU frequency scaling and boosting](#cpu-frequency-scaling-and-boosting)
-- [Hyperthreading](#hyperthreading)
-- [Interrupt requests and SMP affinity](#interrupt-requests-and-smp-affinity)
-    - [Performance monitoring interrupts (PMIs) and `perf`](#performance-monitoring-interrupts-pmis-and-perf)
-- [Additional resources](#additional-resources)
-
-### Introduction
+## Introduction
 
 This document is all about identifying and avoiding potential reproducibility pitfalls when executing performance tests in a Linux-based environment.
 
@@ -21,7 +10,7 @@ To the uninitiated, tracking down and eliminating "OS jitter" can sometimes feel
 
 This document's goal is *not* to improve the performance of your application, help you simulate a realistic production environment, or provide in-depth explanations for various kernel mechanisms. It is currently a bit light on NUMA-specific details, but alas, I don't have access to a NUMA-enabled machine to play with. I'm sure that knowledgable readers will find opportunities for corrections and additions, in which case I'd be grateful if you filed an issue or opened a pull request in this repository.
 
-### Processor shielding and process affinity
+## Processor shielding and process affinity
 
 Processor shielding is a technique that invokes Linux's [`cpuset`](http://man7.org/linux/man-pages/man7/cpuset.7.html) pseudo-filesystem to set up exclusive processors and memory nodes that are protected from Linux's scheduler. The easiest way to create and utilize a processor shield is with [`cset`](http://manpages.ubuntu.com/manpages/precise/man1/cset.1.html), a convenient Python wrapper over the `cpuset` interface. On Ubuntu, `cset` can be installed by running the following:
 
@@ -58,12 +47,12 @@ For slightly lower-level control, you can use `cset`'s other subcommands, [`proc
 
 To maximize consistency between trials, you should make sure that individual threads executed within the shield always use the exact same processor/memory node configuration. This can be accomplished using [hierarchical cpusets](https://rt.wiki.kernel.org/index.php/Cpuset_Management_Utility/tutorial#Implementing_Hierarchy_with_Set_and_Proc) to pin processes to child cpusets created under the shielded cpuset. Other utilities for managing process affinity, like `taskset`, `numactl`, or `tuna`, aren't as useful as `cset` because they don't protect dedicated resources from the scheduler.
 
-### Virtual memory settings
+## Virtual memory settings
 
 The official Linux documentation lists [a plethora of virtual memory settings](https://www.kernel.org/doc/Documentation/sysctl/vm.txt) for configuring Linux's swapping, paging, and caching behavior.
 I encourage the reader to independently investigate the `vm.nr_hugepages`, `vm.vfs_cache_pressure`, `vm.zone_reclaim_mode`, and `vm.min_free_kbytes` properties, but won't discuss these in-depth because they are not likely to have a large impact in the majority of cases. Instead, I'll focus on two properties which are easier to experiment with and a bit less subtle in their effects: swappiness and address space layout randomization.
 
-##### Swappiness
+### Swappiness
 
 Most Linux distributions are configured to [swap](https://wiki.archlinux.org/index.php/swap) aggressively by default, which can heavily skew performance results by increasing the likelihood of swapping during benchmark execution. Luckily, it's easy to tame the kernel's propensity to swap by lowering the [swappiness](https://en.wikipedia.org/wiki/Swappiness) setting, controlled via the `vm.swappiness` parameter:
 
@@ -73,7 +62,7 @@ Most Linux distributions are configured to [swap](https://wiki.archlinux.org/ind
 
 In my experience, lowering `vm.swappiness` to around `10` or so is sufficient to overcome swap-related noise on most memory-bound benchmarks.
 
-##### Address space layout randomization (ASLR)
+### Address space layout randomization (ASLR)
 
 [Address space layout randomization (ASLR)](https://en.wikipedia.org/wiki/Address_space_layout_randomization) is a security feature that makes it harder for malicious programs to exploit buffer overflows. In theory, ASLR could significantly impact reproducibility for benchmarks that are highly susceptible to variations in memory layout. Disabling ASLR should be done at your own risk - it *is* a security feature, after all.
 
@@ -89,7 +78,7 @@ If you don't wish to disable ASLR globally, you can simply start up an ASLR-disa
 ➜ setarch $(uname -m) -R /bin/sh
 ```
 
-### CPU frequency scaling and boosting
+## CPU frequency scaling and boosting
 
 Most modern CPUs support dynamic frequency scaling, which is the ability to adjust their clock rate in order to manage power usage and temperature. On Linux, frequency scaling behavior is determined by heuristics dubbed ["governors"](https://www.kernel.org/doc/Documentation/cpu-freq/governors.txt), each of which prioritizes different patterns of resource utilization. This feature can interfere with performance results if rescaling occurs during benchmarking or between trials, but luckily we can keep the effective clock rate static by enabling the `performance` governor on all processors:
 
@@ -105,7 +94,7 @@ Many CPUs also support discretionary performance ["boosting"](https://www.kernel
 ➜ echo 0 | sudo tee /sys/devices/system/cpu/cpufreq/boost
 ```
 
-### Hyperthreading
+## Hyperthreading
 
 Hyperthreading, more generally known as [simultaneous multithreading (SMT)](https://en.wikipedia.org/wiki/Simultaneous_multithreading), allows multiple software threads to "simultaneously" run on "independent" hardware threads on a single CPU core. The downside is that these threads can't always actually execute concurrently in practice, as they contend for shared CPU resources. Frustratingly, Linux exposes these threads to the operating system as extra logical processors, making techniques like shielding difficult to reason about - how do you know that your shielded "processor" isn't actually sharing a physical core with an unshielded "processor"? Unless your use case demands that you run tests in a hyperthreaded environment, you should consider disabling hyperthreading to make it easier to manage processor resources consistently.
 
@@ -179,7 +168,7 @@ Now, we can verify that hyperthreading is disabled by checking each processor's 
 3
 ```
 
-### Interrupt requests and SMP affinity
+## Interrupt requests and SMP affinity
 
 The kernel will periodically send [interrupt requests (IRQs)](https://en.wikipedia.org/wiki/Interrupt_request_(PC_architecture)) to your processors. As the name implies, IRQs ask a processor to pause the currently running task in order to perform the requested task. There are many different kinds of IRQs, and the degree to which a specific kind of IRQ interferes with a given benchmark depends on the frequency and duration of the IRQ compared to the benchmark's workload.
 
@@ -224,7 +213,7 @@ The optimal way to configure SMP affinities depends a lot on your benchmarks and
 
 A smoke test for determining the impact of IRQs on benchmark results is to see what happens when you turn on/off an IRQ load balancer like [`irqbalance`](http://linux.die.net/man/1/irqbalance). If this has a noticeable effect on your results, it might be worth playing around with SMP affinities to figure out which IRQs should be directed away from your shielded processors.
 
-##### Performance monitoring interrupts (PMIs) and `perf`
+#### Performance monitoring interrupts (PMIs) and `perf`
 
 Performance monitoring interrupts (PMIs) are sent by the kernel's [`perf`](https://perf.wiki.kernel.org/index.php/Main_Page) subsystem, which is used to set and manage [hardware performance counters](https://en.wikipedia.org/wiki/Hardware_performance_counter) monitored by other parts of the kernel. Unless `perf` is a dependency of your benchmarking process, it may be useful to lower `perf`'s sample rate so that PMIs don't interfere with your experiments. One way to do this is to set the [`kernel.perf_cpu_time_max_percent`](https://www.kernel.org/doc/Documentation/sysctl/kernel.txt) parameter to `1`:
 
@@ -240,7 +229,7 @@ This tells the kernel to inform `perf` that it should lower its sample rate such
 
 These messages are nothing to be concerned about - it's simply the kernel reporting that it's lowering `perf`'s max sample rate in order to respect the `perf_cpu_time_max_percent` property we just set.
 
-### Additional resources
+## Additional resources
 
 - While not highly navigable and a bit overwhelming for newcomers, the most authoritative resource for kernel information is the official Linux documentation hosted at [the Linux Kernel Archives](https://www.kernel.org/doc/Documentation/).
 

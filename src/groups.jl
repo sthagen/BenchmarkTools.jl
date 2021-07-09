@@ -297,7 +297,75 @@ function Base.show(io::IO, group::BenchmarkGroup)
         println(io)
         print(io, pad, "  ", repr(k), " => ")
         show(IOContext(io, :pad => "\t"*pad), v)
-        count > nbound && (println(io); print(io, pad, "  ⋮"); break)
         count += 1
+        count > nbound && length(group) > count && (println(io); print(io, pad, "  ⋮"); break)
+    end
+end
+
+
+const benchmark_stack = []
+
+"""
+    @benchmarkset "title" begin ... end
+
+Create a benchmark set, or multiple benchmark sets if a `for` loop is provided.
+
+# Examples
+
+```julia
+@benchmarkset "suite" for k in 1:5
+    @case "case \$k" rand(\$k, \$k)
+end
+```
+"""
+macro benchmarkset(title, ex)
+    esc(benchmarkset_m(title, ex))
+end
+
+"""
+    @case title <expr to benchmark> [setup=<setup expr>]
+
+Mark an expression as a benchmark case. Must be used inside [`@benchmarkset`](@ref).
+"""
+macro case(title, xs...)
+    esc(:($(Symbol("#suite#"))[$title] = @benchmarkable $(xs...)))
+end
+
+function benchmarkset_m(title, ex::Expr)
+    stack = GlobalRef(BenchmarkTools, :benchmark_stack)
+    init = quote
+        if isempty($stack)
+            push!($stack, $BenchmarkGroup())
+        end
+    end
+    exec = quote
+        if length($stack) == 1
+            pop!($stack)
+        end
+    end
+    return if ex.head === :block
+        quote
+            $init
+            $(benchmarkset_block(title, ex))
+            $exec
+        end
+    elseif ex.head === :for
+        quote
+            $init
+            $(Expr(ex.head, ex.args[1], benchmarkset_block(title, ex.args[2]))) 
+            $exec
+        end
+    end
+end
+
+function benchmarkset_block(title, ex::Expr)
+    stack = GlobalRef(BenchmarkTools, :benchmark_stack)
+    quote
+        let $(Symbol("#root#")) = last($stack)
+            $(Symbol("#root#"))[$title] = $(Symbol("#suite#")) = BenchmarkGroup()
+            push!($stack, $(Symbol("#suite#")))
+            $ex
+            pop!($stack)
+        end
     end
 end

@@ -1,5 +1,7 @@
 # BenchmarkTools.jl
 
+[![][docs-stable-img]][docs-stable-url]
+[![][docs-dev-img]][docs-dev-url]
 [![Build Status](https://github.com/JuliaCI/BenchmarkTools.jl/workflows/CI/badge.svg)](https://github.com/JuliaCI/BenchmarkTools.jl/actions/workflows/CI.yml?query=branch%3Amaster)
 [![Code Coverage](https://codecov.io/gh/JuliaCI/BenchmarkTools.jl/branch/master/graph/badge.svg?label=codecov&token=ccN7NZpkBx)](https://codecov.io/gh/JuliaCI/BenchmarkTools.jl)
 
@@ -11,23 +13,32 @@ The CI infrastructure for automated performance testing of the Julia language is
 
 ## Installation
 
-To install BenchmarkTools, you can run the following:
+<p>
+BenchmarkTools is a &nbsp;
+    <a href="https://julialang.org">
+        <img src="https://raw.githubusercontent.com/JuliaLang/julia-logo-graphics/master/images/julia.ico" width="16em">
+        Julia Language
+    </a>
+    &nbsp; package. To install BenchmarkTools,
+    please <a href="https://docs.julialang.org/en/v1/manual/getting-started/">open
+    Julia's interactive session (known as REPL)</a> and press <kbd>]</kbd> key in the REPL to use the package mode, then type the following command
+</p>
 
 ```julia
-Pkg.add("BenchmarkTools")
+pkg> add BenchmarkTools
 ```
 
 ## Documentation
 
-If you're just getting started, check out the [manual](doc/manual.md) for a thorough explanation of BenchmarkTools.
+If you're just getting started, check out the [manual](https://juliaci.github.io/BenchmarkTools.jl/dev/manual/) for a thorough explanation of BenchmarkTools.
 
-If you want to explore the BenchmarkTools API, see the [reference document](doc/reference.md).
+If you want to explore the BenchmarkTools API, see the [reference document](https://juliaci.github.io/BenchmarkTools.jl/dev/reference/).
 
 If you want a short example of a toy benchmark suite, see the sample file in this repo ([benchmark/benchmarks.jl](benchmark/benchmarks.jl)).
 
 If you want an extensive example of a benchmark suite being used in the real world, you can look at the source code of [BaseBenchmarks.jl](https://github.com/JuliaCI/BaseBenchmarks.jl/tree/nanosoldier).
 
-If you're benchmarking on Linux, I wrote up a series of [tips and tricks](https://github.com/JuliaCI/BenchmarkTools.jl/blob/master/doc/linuxtips.md) to help eliminate noise during performance tests.
+If you're benchmarking on Linux, I wrote up a series of [tips and tricks](https://juliaci.github.io/BenchmarkTools.jl/dev/linuxtips/) to help eliminate noise during performance tests.
 
 ## Quick Start
 
@@ -39,24 +50,24 @@ julia> using BenchmarkTools
 # The `setup` expression is run once per sample, and is not included in the
 # timing results. Note that each sample can require multiple evaluations
 # benchmark kernel evaluations. See the BenchmarkTools manual for details.
-julia> @benchmark sin(x) setup=(x=rand())
-BenchmarkTools.Trial:
-  memory estimate:  0 bytes
-  allocs estimate:  0
-  --------------
-  minimum time:     4.248 ns (0.00% GC)
-  median time:      4.631 ns (0.00% GC)
-  mean time:        5.502 ns (0.00% GC)
-  maximum time:     60.995 ns (0.00% GC)
-  --------------
-  samples:          10000
-  evals/sample:     1000
+julia> @benchmark sort(data) setup=(data=rand(10))
+BenchmarkTools.Trial: 10000 samples with 972 evaluations.
+ Range (min … max):  69.399 ns …  1.066 μs  ┊ GC (min … max): 0.00% … 0.00%
+ Time  (median):     83.850 ns              ┊ GC (median):    0.00%
+ Time  (mean ± σ):   89.471 ns ± 53.666 ns  ┊ GC (mean ± σ):  3.25% ± 5.16%
+
+          ▁▄▇█▇▆▃▁                                                 
+  ▂▁▁▂▂▃▄▆████████▆▅▄▃▃▃▃▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂
+  69.4 ns           Histogram: frequency by time             145 ns (top 1%)
+
+ Memory estimate: 160 bytes, allocs estimate: 1.
 ```
 
 For quick sanity checks, one can use the [`@btime` macro](https://github.com/JuliaCI/BenchmarkTools.jl/blob/master/doc/manual.md#benchmarking-basics), which is a convenience wrapper around `@benchmark` whose output is analogous to Julia's built-in [`@time` macro](https://docs.julialang.org/en/v1/base/base/#Base.@time):
 
 ```julia
-julia> @btime sin(x) setup=(x=rand())
+# The `seconds` expression helps set a rough time budget, see Manual for more explaination
+julia> @btime sin(x) setup=(x=rand()) seconds=3
   4.361 ns (0 allocations: 0 bytes)
 0.49587200950472454
 ```
@@ -94,7 +105,7 @@ julia> @btime $(Ref(a))[] + $(Ref(b))[]
 3
 ```
 
-As described the [manual](doc/manual.md), the BenchmarkTools package supports many other features, both for additional output and for more fine-grained control over the benchmarking process.
+As described the [manual](https://juliaci.github.io/BenchmarkTools.jl/dev/manual/), the BenchmarkTools package supports many other features, both for additional output and for more fine-grained control over the benchmarking process.
 
 ## Why does this package exist?
 
@@ -124,3 +135,8 @@ This package was authored primarily by Jarrett Revels (@jrevels). Additionally, 
 - Andreas Noack, for statistics help and investigating weird benchmark time distributions
 - Oscar Blumberg, for discussions on noise robustness
 - Jiahao Chen, for discussions on error analysis
+
+[docs-dev-img]: https://img.shields.io/badge/docs-dev-blue.svg
+[docs-dev-url]: https://JuliaCI.github.io/BenchmarkTools.jl/dev/
+[docs-stable-img]: https://img.shields.io/badge/docs-stable-blue.svg
+[docs-stable-url]: https://JuliaCI.github.io/BenchmarkTools.jl/stable
